@@ -3,27 +3,30 @@ import mediapipe as mp
 import time
 from pathlib import Path
 
+
 class Camera:
+    POSTURE_LANDMARKS = {
+        "nose": 0,
+        "left_ear": 7,
+        "right_ear": 8,
+        "left_shoulder": 11,
+        "right_shoulder": 12,
+        "left_hip": 23,
+        "right_hip": 24
+    }
 
-    EYE_INDICES = [
-        33, 133, 159, 145,
-        362, 263, 386, 374
-    ]
-
-    POSTURE_INDICES = [
-        0, 7, 8, 11, 12, 23, 24
-    ]
-
-    def __init__(self):
+    def __init__(self, camera_index=0):
 
         base_dir = Path(__file__).resolve().parent
-
         pose_model = base_dir / "models" / "pose_landmarker_lite.task"
-        face_model = base_dir / "models" / "face_landmarker.task"
+
+        if not pose_model.exists():
+            raise FileNotFoundError(
+                f"Pose model not found: {pose_model}"
+            )
 
         BaseOptions = mp.tasks.BaseOptions
         RunningMode = mp.tasks.vision.RunningMode
-
         pose_options = mp.tasks.vision.PoseLandmarkerOptions(
             base_options=BaseOptions(
                 model_asset_path=str(pose_model)
@@ -32,31 +35,17 @@ class Camera:
             num_poses=1
         )
 
-        face_options = mp.tasks.vision.FaceLandmarkerOptions(
-            base_options=BaseOptions(
-                model_asset_path=str(face_model)
-            ),
-            running_mode=RunningMode.VIDEO,
-            num_faces=1
-        )
-
         self.pose_detector = (
             mp.tasks.vision.PoseLandmarker.create_from_options(
                 pose_options
             )
         )
 
-        self.face_detector = (
-            mp.tasks.vision.FaceLandmarker.create_from_options(
-                face_options
-            )
-        )
-
-        self.cap = cv2.VideoCapture(0)
+        self.cap = cv2.VideoCapture(camera_index)
 
         if not self.cap.isOpened():
+            self.cap.release()
             self.pose_detector.close()
-            self.face_detector.close()
             raise RuntimeError("Could not open webcam")
 
         self.start_time = time.monotonic()
@@ -66,7 +55,7 @@ class Camera:
 
         success, frame = self.cap.read()
 
-        if not success:
+        if not success: 
             return None
 
         frame = cv2.flip(frame, 1)
@@ -97,28 +86,6 @@ class Camera:
             timestamp_ms
         )
 
-        face_result = self.face_detector.detect_for_video(
-            mp_image,
-            timestamp_ms
-        )
-
-        # Extract eye landmarks
-        eyes = None
-
-        if face_result.face_landmarks:
-
-            landmarks = face_result.face_landmarks[0]
-
-            eyes = {
-                i: (
-                    landmarks[i].x,
-                    landmarks[i].y,
-                    landmarks[i].z
-                )
-                for i in self.EYE_INDICES
-            }
-
-        # Extract posture landmarks
         posture = None
 
         if pose_result.pose_landmarks:
@@ -126,21 +93,20 @@ class Camera:
             landmarks = pose_result.pose_landmarks[0]
 
             posture = {
-                i: (
-                    landmarks[i].x,
-                    landmarks[i].y,
-                    landmarks[i].z
-                )
-                for i in self.POSTURE_INDICES
+                name: {
+                    "x": landmarks[index].x,
+                    "y": landmarks[index].y,
+                    "z": landmarks[index].z,
+                    "visibility": landmarks[index].visibility
+                }
+                for name, index in self.POSTURE_LANDMARKS.items()
             }
 
         return {
             "timestamp_ms": timestamp_ms,
-            "eyes": eyes,
             "posture": posture
         }
 
     def close(self):
         self.cap.release()
         self.pose_detector.close()
-        self.face_detector.close()

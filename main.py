@@ -39,6 +39,11 @@ for i in range (0,2):
 
 avg = (ashL,ashR,aeL,aeR)
 
+#until the program is closed with escape key
+#each frame update get the data from the camera, update the all the metrics
+#get score and increment it 
+#determine the ui changes 
+
 
 
 

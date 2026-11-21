@@ -1,2 +1,2 @@
-# TEAM_2_UTEK_2026
-Team 2 UTEK 2026 repo
+# Ambient Ergo Team 2
+Ambient Ergo - Team 2 UTEK 2026
